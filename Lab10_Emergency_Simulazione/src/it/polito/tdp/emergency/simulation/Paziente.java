@@ -19,6 +19,8 @@ public class Paziente implements Comparable<Paziente> {
 
 	private int id;
 	private StatoPaziente stato;
+	
+	private Dottore d=null;
 
 	@Override
 	public int hashCode() {
@@ -60,6 +62,18 @@ public class Paziente implements Comparable<Paziente> {
 		super();
 		this.id = id;
 		this.stato = stato;
+	}
+	
+	
+
+
+
+	public Dottore getD() {
+		return d;
+	}
+
+	public void setD(Dottore d) {
+		this.d = d;
 	}
 
 	@Override

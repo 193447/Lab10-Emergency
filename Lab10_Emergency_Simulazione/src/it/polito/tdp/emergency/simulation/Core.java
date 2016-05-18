@@ -12,7 +12,7 @@
 
 package it.polito.tdp.emergency.simulation;
 
-import java.util.HashMap;
+import java.util.*;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Queue;
@@ -31,19 +31,19 @@ public class Core {
 
 	Queue<Evento> listaEventi = new PriorityQueue<Evento>();
 	Map<Integer, Paziente> pazienti = new HashMap<Integer, Paziente>();
-	int mediciDisponibili = 0;
+	Map<Integer,Dottore> dottori = new HashMap<Integer,Dottore>();
 	Queue<Paziente> pazientiInAttesa = new PriorityQueue<Paziente>();
+	long inizioSimulazione=0;
+	int contatore=0;
 
-	public int getMediciDisponibili() {
-		return mediciDisponibili;
-	}
-
-	public void setMediciDisponibili(int mediciDisponibili) {
-		this.mediciDisponibili = mediciDisponibili;
-	}
 
 	public void aggiungiEvento(Evento e) {
 		listaEventi.add(e);
+	}
+	
+	
+	public void aggiungiDottore(int id,Dottore e) {
+		dottori.put(id,e);
 	}
 
 	public void aggiungiPaziente(Paziente p) {
@@ -52,10 +52,23 @@ public class Core {
 
 	public void passo() {
 		Evento e = listaEventi.remove();
+		if(contatore==0){
+			inizioSimulazione=e.getTempo();
+		}
 		switch (e.getTipo()) {
 		case PAZIENTE_ARRIVA:
 			System.out.println("Arrivo paziente:" + e);
 			pazientiInAttesa.add(pazienti.get(e.getDato()));
+			for(Dottore d1:dottori.values()){
+			if(!dottori.isEmpty() && d1.getStato()==Dottore.StatoDottore.IN_PAUSA){
+				Dottore d=d1;
+				this.aggiungiEvento(new Evento(inizioSimulazione + d.getOraInizioTurno(), Evento.TipoEvento.DOTTORE_INIZIA_TURNO, d.id));
+				if(e.getTipo()==Evento.TipoEvento.DOTTORE_INIZIA_TURNO)
+					d.setStato(Dottore.StatoDottore.IN_ATTESA);
+				this.aggiungiEvento(new Evento(inizioSimulazione + d.getOraInizioTurno() + 8*60, Evento.TipoEvento.DOTTORE_TERMINA_TURNO, d.id));
+				if(e.getTipo()==Evento.TipoEvento.DOTTORE_TERMINA_TURNO)
+					d.setStato(Dottore.StatoDottore.IN_PAUSA);
+			}
 			switch (pazienti.get(e.getDato()).getStato()) {
 			case BIANCO:
 				break;
@@ -72,43 +85,64 @@ public class Core {
 				System.err.println("Panik!");
 			}
 			break;
+			}
 		case PAZIENTE_GUARISCE:
 			if (pazienti.get(e.getDato()).getStato() != Paziente.StatoPaziente.NERO) {
 				System.out.println("Paziente salvato: " + e);
 				pazienti.get(e.getDato()).setStato(Paziente.StatoPaziente.SALVO);
-				++mediciDisponibili;
-				++pazientiSalvati;
+				Paziente p=getPaziente(e.getDato());
+				p.getD().setStato(Dottore.StatoDottore.IN_ATTESA);
+				p.setD(null);
+				p.getD().setPazienteAssegnato(null);
+				pazientiSalvati++;
 			}
 			break;
 		case PAZIENTE_MUORE:
 			if (pazienti.get(e.getDato()).getStato() == Paziente.StatoPaziente.SALVO) {
 				System.out.println("Paziente gi� salvato: " + e);
 			} else {
-				++pazientiPersi;
+				pazientiPersi++;
 				pazienti.get(e.getDato()).setStato(Paziente.StatoPaziente.NERO);
 				System.out.println("Paziente morto: " + e);
+				Paziente p=getPaziente(e.getDato());
 				if (pazienti.get(e.getDato()).getStato() == Paziente.StatoPaziente.IN_CURA) {
-					++mediciDisponibili;
+					p.getD().setStato(Dottore.StatoDottore.IN_ATTESA);
 				}
 			}
 			break;
 		default:
 			System.err.println("Panik!");
 		}
+			while (cura(e.getTempo(),dottori.get(dottoreLibero())))
+				;
+		}
 
-		while (cura(e.getTempo()))
-			;
+	private Paziente getPaziente(int dato) {
+		for(Paziente p:pazienti.values()){
+			if(p.getId()==dato)
+				return p;
+		}
+			return null;
 	}
 
-	protected boolean cura(long adesso) {
+	private Dottore dottoreLibero() {
+		for(Dottore d:dottori.values()){
+			if(d.pazienteAssegnato!=null && d.getStato()==Dottore.StatoDottore.IN_ATTESA)
+				return d;
+		}
+		return null;
+	}
+
+
+	protected boolean cura(long adesso,Dottore d) {
 		if (pazientiInAttesa.isEmpty())
 			return false;
-		if (mediciDisponibili == 0)
-			return false;
-
+		
 		Paziente p = pazientiInAttesa.remove();
 		if (p.getStato() != Paziente.StatoPaziente.NERO) {
-			--mediciDisponibili;
+			d.setStato(Dottore.StatoDottore.IN_TURNO);
+			d.setPazienteAssegnato(p);
+			p.setD(d);
 			pazienti.get(p.getId()).setStato(Paziente.StatoPaziente.IN_CURA);
 			aggiungiEvento(new Evento(adesso + 30, Evento.TipoEvento.PAZIENTE_GUARISCE, p.getId()));
 			System.out.println("Inizio a curare: " + p);

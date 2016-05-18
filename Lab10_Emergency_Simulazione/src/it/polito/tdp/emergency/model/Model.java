@@ -11,7 +11,7 @@ public class Model {
 	protected void stub() {
 		simulatore = new Core();
 
-		simulatore.setMediciDisponibili(1);
+		//simulatore.setMediciDisponibili(1);
 
 		simulatore.aggiungiPaziente(new Paziente(1, Paziente.StatoPaziente.ROSSO));
 		simulatore.aggiungiPaziente(new Paziente(2, Paziente.StatoPaziente.ROSSO));
